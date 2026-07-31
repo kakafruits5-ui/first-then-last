@@ -3,26 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Late Rush | Tragic Narrative Platformer</title>
+    <title>Forest Runner | Animated Edition</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="game-container">
         <div class="hud">
-            <div id="level-display">FLOOR: 1 / 50</div>
-            <div id="story-subtext">"I have to hurry... they are waiting for me."</div>
-            <div id="controller-status">🎮 Xbox Controller: Disconnected</div>
+            <div id="level-display">FOREST ZONE</div>
+            <div id="controller-status">🎮 Controller: Disconnected</div>
         </div>
         
         <div class="canvas-relative-wrapper">
             <canvas id="gameCanvas" width="800" height="500"></canvas>
-            <!-- Overlay element used to display text during the ending cutscene -->
-            <div id="cutscene-overlay" class="hidden-overlay"></div>
+            <!-- Preload your sprite sheet here -->
+            <img id="player-sprite" src="image_576fdc.png" style="display: none;">
         </div>
         
         <div class="controls-guide">
-            <p><strong>Xbox Inputs:</strong> Left Stick / D-Pad to Move | <strong>Button A</strong> to Jump | <strong>Button X</strong> to Slash Enemy</p>
-            <p><strong>Keyboard Inputs:</strong> A / D or Arrows to Move | <strong>Space / W</strong> to Jump | <strong>Key F</strong> to Slash</p>
+            <p><strong>Controls:</strong> Left Stick / D-Pad to Move | <strong>Button A</strong> to Jump</p>
         </div>
     </div>
 
