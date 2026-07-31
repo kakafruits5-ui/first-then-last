@@ -2,18 +2,18 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const controllerStatus = document.getElementById("controller-status");
 
-const playerSprite = document.getElementById("player-sprite");
+// Load the separate left and right animation sheets
+const walkLeftImg = new Image();
+walkLeftImg.src = "walkleft-removebg-preview.png";
 
-// --- SPRITE SHEET CONFIGURATION ---
-const spriteConfig = {
-    spriteWidth: 16,  
-    spriteHeight: 16, 
-    idleSideRow: 1,   // Row 2: Idle side
-    runSideRow: 4,    // Row 5: Run side
+const walkRightImg = new Image();
+walkRightImg.src = "walkright-removebg-preview.png";
+
+const animConfig = {
+    totalFrames: 3, // Each image has 3 frames
     frameX: 0,
-    maxFrames: 3,     
     gameFrame: 0,
-    staggerFrames: 8  
+    staggerFrames: 8 // Animation speed
 };
 
 let keys = {};
@@ -21,16 +21,16 @@ let keys = {};
 const player = {
     x: 50,
     y: 300,
-    width: 36,  // Scaled up cleanly for visibility
-    height: 36,
+    width: 32,  
+    height: 44, // Proportional height for the character
     vx: 0,
     vy: 0,
     speed: 4.5,
     gravity: 0.55,
-    jumpStrength: -10.5,
+    jumpStrength: -10,
     isGrounded: false,
-    jumpCount: 0,     // Tracks double jumps
-    maxJumps: 2,
+    jumpCount: 0,     // Tracks mid-air double jumps
+    maxJumps: 2,      // Double jump enabled
     facing: "right",
     state: "idle"
 };
@@ -88,7 +88,6 @@ function processInputs() {
     if (keys["ArrowLeft"] || keys["KeyA"]) { player.vx = -player.speed; }
     if (keys["ArrowRight"] || keys["KeyD"]) { player.vx = player.speed; }
     
-    // Key press handler with debounce to prevent holding jump for infinite flight
     let currentJumpKey = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
     if (currentJumpKey && !player.jumpKeyPressed) {
         jumpPressed = true;
@@ -160,7 +159,7 @@ function updatePhysics() {
             if (player.vy > 0) {
                 player.y = plat.y - player.height;
                 player.isGrounded = true;
-                player.jumpCount = 0; // Reset double jump on landing
+                player.jumpCount = 0; // Reset jumps upon landing
             } else if (player.vy < 0) {
                 player.y = plat.y + plat.height;
             }
@@ -170,16 +169,14 @@ function updatePhysics() {
 }
 
 function updateAnimation() {
-    spriteConfig.maxFrames = player.state === "run" ? 4 : 3;
-
-    if (spriteConfig.gameFrame % spriteConfig.staggerFrames === 0) {
-        if (spriteConfig.frameX < spriteConfig.maxFrames - 1) {
-            spriteConfig.frameX++;
-        } else {
-            spriteConfig.frameX = 0;
+    if (player.state === "run") {
+        if (animConfig.gameFrame % animConfig.staggerFrames === 0) {
+            animConfig.frameX = (animConfig.frameX + 1) % animConfig.totalFrames;
         }
+        animConfig.gameFrame++;
+    } else {
+        animConfig.frameX = 0; // Idle frame
     }
-    spriteConfig.gameFrame++;
 }
 
 function drawGameScene() {
@@ -204,35 +201,26 @@ function drawGameScene() {
         ctx.fillRect(plat.x, plat.y, plat.width, 4);
     });
 
-    // 3. Draw Animated Player (Transparent White Background Fix via 'multiply')
-    let currentRow = player.state === "run" ? spriteConfig.runSideRow : spriteConfig.idleSideRow;
+    // 3. Draw Character with Transparent PNG Sprites
+    const activeImg = player.facing === "left" ? walkLeftImg : walkRightImg;
 
-    if (playerSprite.complete && playerSprite.naturalWidth !== 0) {
-        ctx.save();
-        let destX = player.x;
-        let destY = player.y;
-
-        if (player.facing === "left") {
-            ctx.scale(-1, 1);
-            destX = -player.x - player.width;
-        }
-
-        // 'multiply' blend mode forces the solid white background of the sprite sheet to become invisible
-        ctx.globalCompositeOperation = 'multiply';
+    if (activeImg.complete && activeImg.naturalWidth !== 0) {
+        const sourceWidth = activeImg.naturalWidth / animConfig.totalFrames;
+        const sourceHeight = activeImg.naturalHeight;
 
         ctx.drawImage(
-            playerSprite, 
-            spriteConfig.frameX * spriteConfig.spriteWidth, 
-            currentRow * spriteConfig.spriteHeight, 
-            spriteConfig.spriteWidth, 
-            spriteConfig.spriteHeight, 
-            destX, 
-            destY, 
+            activeImg, 
+            animConfig.frameX * sourceWidth, 
+            0, 
+            sourceWidth, 
+            sourceHeight, 
+            player.x, 
+            player.y, 
             player.width, 
             player.height
         );
-        ctx.restore();
     } else {
+        // Fallback box while loading
         ctx.fillStyle = "#00ffff";
         ctx.fillRect(player.x, player.y, player.width, player.height);
     }
