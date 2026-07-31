@@ -4,16 +4,16 @@ const controllerStatus = document.getElementById("controller-status");
 
 const playerSprite = document.getElementById("player-sprite");
 
-// --- CORRECTED 16x16 SPRITE CONFIGURATION ---
+// --- SPRITE SHEET CONFIGURATION ---
 const spriteConfig = {
-    spriteWidth: 16,  // Standard size for this sprite sheet asset pack
+    spriteWidth: 16,  
     spriteHeight: 16, 
     idleSideRow: 1,   // Row 2: Idle side
     runSideRow: 4,    // Row 5: Run side
     frameX: 0,
     maxFrames: 3,     
     gameFrame: 0,
-    staggerFrames: 8  // Animation speed
+    staggerFrames: 8  
 };
 
 let keys = {};
@@ -21,14 +21,16 @@ let keys = {};
 const player = {
     x: 50,
     y: 300,
-    width: 28,  // Render size on canvas (scaled up slightly so it's easy to see)
-    height: 28,
+    width: 36,  // Scaled up cleanly for visibility
+    height: 36,
     vx: 0,
     vy: 0,
     speed: 4.5,
-    gravity: 0.6,
-    jumpStrength: -11,
+    gravity: 0.55,
+    jumpStrength: -10.5,
     isGrounded: false,
+    jumpCount: 0,     // Tracks double jumps
+    maxJumps: 2,
     facing: "right",
     state: "idle"
 };
@@ -73,21 +75,42 @@ function processInputs() {
 
         if (gp.axes[0] < -0.25 || gp.buttons[14]?.pressed) { player.vx = -player.speed; }
         if (gp.axes[0] > 0.25 || gp.buttons[15]?.pressed) { player.vx = player.speed; }
-        if (gp.buttons[0]?.pressed) { jumpPressed = true; }
+        if (gp.buttons[0]?.pressed && !player.jumpKeyPressed) { 
+            jumpPressed = true; 
+            player.jumpKeyPressed = true;
+        }
+        if (!gp.buttons[0]?.pressed) { player.jumpKeyPressed = false; }
     } else {
-        controllerStatus.textContent = "🎮 Controller: Press any button to wake";
-        controllerStatus.style.color = "#ffaa33";
+        controllerStatus.textContent = "🎮 Controller: Disconnected (Use A/D & Space)";
+        controllerStatus.style.color = "#779988";
     }
 
     if (keys["ArrowLeft"] || keys["KeyA"]) { player.vx = -player.speed; }
     if (keys["ArrowRight"] || keys["KeyD"]) { player.vx = player.speed; }
-    if (keys["Space"] || keys["ArrowUp"] || keys["KeyW"]) { jumpPressed = true; }
-
-    if (jumpPressed && player.isGrounded) {
-        player.vy = player.jumpStrength;
-        player.isGrounded = false;
+    
+    // Key press handler with debounce to prevent holding jump for infinite flight
+    let currentJumpKey = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
+    if (currentJumpKey && !player.jumpKeyPressed) {
+        jumpPressed = true;
+        player.jumpKeyPressed = true;
+    }
+    if (!currentJumpKey) {
+        player.jumpKeyPressed = false;
     }
 
+    // --- DOUBLE JUMP LOGIC ---
+    if (jumpPressed) {
+        if (player.isGrounded) {
+            player.vy = player.jumpStrength;
+            player.isGrounded = false;
+            player.jumpCount = 1;
+        } else if (player.jumpCount < player.maxJumps) {
+            player.vy = player.jumpStrength * 0.95; // Second mid-air boost
+            player.jumpCount = 2;
+        }
+    }
+
+    // Animation state update
     if (player.vx > 0) {
         player.facing = "right";
         player.state = "run";
@@ -107,6 +130,7 @@ function isColliding(a, b) {
 }
 
 function updatePhysics() {
+    // X Axis Movement & Collision
     player.x += player.vx;
     if (player.x < 0) player.x = 0;
     if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
@@ -119,6 +143,7 @@ function updatePhysics() {
         }
     }
 
+    // Y Axis Movement & Collision
     player.vy += player.gravity;
     player.y += player.vy;
     player.isGrounded = false;
@@ -127,6 +152,7 @@ function updatePhysics() {
         player.x = 50;
         player.y = 300;
         player.vy = 0;
+        player.jumpCount = 0;
     }
 
     for (let plat of platforms) {
@@ -134,6 +160,7 @@ function updatePhysics() {
             if (player.vy > 0) {
                 player.y = plat.y - player.height;
                 player.isGrounded = true;
+                player.jumpCount = 0; // Reset double jump on landing
             } else if (player.vy < 0) {
                 player.y = plat.y + plat.height;
             }
@@ -177,7 +204,7 @@ function drawGameScene() {
         ctx.fillRect(plat.x, plat.y, plat.width, 4);
     });
 
-    // 3. Draw Player (With safety fallback if image isn't loaded yet)
+    // 3. Draw Animated Player (Transparent White Background Fix via 'multiply')
     let currentRow = player.state === "run" ? spriteConfig.runSideRow : spriteConfig.idleSideRow;
 
     if (playerSprite.complete && playerSprite.naturalWidth !== 0) {
@@ -189,6 +216,9 @@ function drawGameScene() {
             ctx.scale(-1, 1);
             destX = -player.x - player.width;
         }
+
+        // 'multiply' blend mode forces the solid white background of the sprite sheet to become invisible
+        ctx.globalCompositeOperation = 'multiply';
 
         ctx.drawImage(
             playerSprite, 
@@ -203,7 +233,6 @@ function drawGameScene() {
         );
         ctx.restore();
     } else {
-        // Fallback box if image is loading
         ctx.fillStyle = "#00ffff";
         ctx.fillRect(player.x, player.y, player.width, player.height);
     }
