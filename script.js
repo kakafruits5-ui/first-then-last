@@ -10,10 +10,10 @@ const walkRightImg = new Image();
 walkRightImg.src = "walkright-removebg-preview.png";
 
 const animConfig = {
-    totalFrames: 3, // Each image has 3 frames
+    totalFrames: 3, 
     frameX: 0,
     gameFrame: 0,
-    staggerFrames: 8 // Animation speed
+    staggerFrames: 8 
 };
 
 let keys = {};
@@ -22,14 +22,14 @@ const player = {
     x: 50,
     y: 300,
     width: 32,  
-    height: 44, // Proportional height for the character
+    height: 44, 
     vx: 0,
     vy: 0,
     speed: 4.5,
     gravity: 0.55,
     jumpStrength: -10,
     isGrounded: false,
-    jumpCount: 0,     // Tracks mid-air double jumps
+    jumpCount: 0,     // Tracks number of button presses for jumping
     maxJumps: 2,      // Double jump enabled
     facing: "right",
     state: "idle"
@@ -68,6 +68,7 @@ function processInputs() {
     let jumpPressed = false;
 
     const gamepads = navigator.getGamepads();
+    let controllerJump = false;
     if (gamepads && gamepads[0]) {
         const gp = gamepads[0];
         controllerStatus.textContent = "🎮 Controller: Connected";
@@ -75,11 +76,7 @@ function processInputs() {
 
         if (gp.axes[0] < -0.25 || gp.buttons[14]?.pressed) { player.vx = -player.speed; }
         if (gp.axes[0] > 0.25 || gp.buttons[15]?.pressed) { player.vx = player.speed; }
-        if (gp.buttons[0]?.pressed && !player.jumpKeyPressed) { 
-            jumpPressed = true; 
-            player.jumpKeyPressed = true;
-        }
-        if (!gp.buttons[0]?.pressed) { player.jumpKeyPressed = false; }
+        if (gp.buttons[0]?.pressed) { controllerJump = true; } // Button 'A' on controller
     } else {
         controllerStatus.textContent = "🎮 Controller: Disconnected (Use A/D & Space)";
         controllerStatus.style.color = "#779988";
@@ -88,24 +85,27 @@ function processInputs() {
     if (keys["ArrowLeft"] || keys["KeyA"]) { player.vx = -player.speed; }
     if (keys["ArrowRight"] || keys["KeyD"]) { player.vx = player.speed; }
     
-    let currentJumpKey = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
-    if (currentJumpKey && !player.jumpKeyPressed) {
+    let keyboardJump = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
+    let rawJumpPressed = keyboardJump || controllerJump;
+
+    // Edge detection so holding the button doesn't trigger continuous flight
+    if (rawJumpPressed && !player.jumpKeyPressed) {
         jumpPressed = true;
         player.jumpKeyPressed = true;
     }
-    if (!currentJumpKey) {
+    if (!rawJumpPressed) {
         player.jumpKeyPressed = false;
     }
 
-    // --- DOUBLE JUMP LOGIC ---
+    // --- DOUBLE JUMP LOGIC (Press 2 times total) ---
     if (jumpPressed) {
         if (player.isGrounded) {
             player.vy = player.jumpStrength;
             player.isGrounded = false;
-            player.jumpCount = 1;
+            player.jumpCount = 1; // First press (Ground jump)
         } else if (player.jumpCount < player.maxJumps) {
-            player.vy = player.jumpStrength * 0.95; // Second mid-air boost
-            player.jumpCount = 2;
+            player.vy = player.jumpStrength * 0.95; // Second press (Mid-air double jump)
+            player.jumpCount = 2; // Reached max allowed jumps
         }
     }
 
@@ -157,9 +157,9 @@ function updatePhysics() {
     for (let plat of platforms) {
         if (isColliding(player, plat)) {
             if (player.vy > 0) {
-                player.y = plat.y - player.height;
+                player.y = plat.y - plat.height;
                 player.isGrounded = true;
-                player.jumpCount = 0; // Reset jumps upon landing
+                player.jumpCount = 0; // Reset jumps on landing
             } else if (player.vy < 0) {
                 player.y = plat.y + plat.height;
             }
@@ -175,7 +175,7 @@ function updateAnimation() {
         }
         animConfig.gameFrame++;
     } else {
-        animConfig.frameX = 0; // Idle frame
+        animConfig.frameX = 0; 
     }
 }
 
@@ -201,12 +201,15 @@ function drawGameScene() {
         ctx.fillRect(plat.x, plat.y, plat.width, 4);
     });
 
-    // 3. Draw Character with Transparent PNG Sprites
+    // 3. Draw Character with 'multiply' blend mode to remove white background boxes
     const activeImg = player.facing === "left" ? walkLeftImg : walkRightImg;
 
     if (activeImg.complete && activeImg.naturalWidth !== 0) {
         const sourceWidth = activeImg.naturalWidth / animConfig.totalFrames;
         const sourceHeight = activeImg.naturalHeight;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
 
         ctx.drawImage(
             activeImg, 
@@ -219,8 +222,8 @@ function drawGameScene() {
             player.width, 
             player.height
         );
+        ctx.restore();
     } else {
-        // Fallback box while loading
         ctx.fillStyle = "#00ffff";
         ctx.fillRect(player.x, player.y, player.width, player.height);
     }
